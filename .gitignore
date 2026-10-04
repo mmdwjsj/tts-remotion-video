@@ -1,0 +1,80 @@
+# =========================
+# Node.js
+# =========================
+node_modules/
+.npm-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Python
+# =========================
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Generated output
+# =========================
+output/*
+!output/.gitkeep
+
+temp/*
+!temp/.gitkeep
+
+jobs/*
+!jobs/.gitkeep
+
+public/generated/*
+!public/generated/.gitkeep
+
+# =========================
+# TTS / AI Models
+# =========================
+models/
+model/
+ttsModels/
+
+*.safetensors
+*.pth
+*.pt
+*.onnx
+*.bin
+
+# =========================
+# Generated media
+# =========================
+*.mp3
+*.wav
+*.mp4
+*.webm
+*.mov
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# IDE
+# =========================
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
