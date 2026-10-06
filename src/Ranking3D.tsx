@@ -6,7 +6,7 @@ import { RankingVideoProps } from "./data";
 import { cameraConfig } from "./config/cameraConfig";
 import { sceneConfig } from "./config/sceneConfig";
 import { columnHeight, numericValue } from "./value";
-import { BRAND_INTRO_FRAMES } from "./timing";
+import { BRAND_INTRO_FRAMES, TITLE_VISIBLE_FRAMES } from "./timing";
 
 export const Ranking3D: React.FC<RankingVideoProps> = ({
   title,
@@ -44,7 +44,24 @@ export const Ranking3D: React.FC<RankingVideoProps> = ({
         motionDuration);
   // The very first frame is the intentional black lead-in; keep it clean and
   // reveal the title from frame 1 onward.
-  const titleVisible = frame > 0 && frame < BRAND_INTRO_FRAMES;
+  // 只有当frame大于0 并且 小于 BRAND_INTRO_FRAMES 的时候标题才会显示
+  // const titleVisible = frame < TITLE_VISIBLE_FRAMES;
+  const fps = 30;
+  const intro = timeline?.find((segment) => segment.id === "intro");
+
+  let titleVisibleUntilFrame = TITLE_VISIBLE_FRAMES;
+  if (intro) {
+    const configuredDelay = intro.cameraMoveDelay ?? 0.5;
+    const actualDelay = Math.min(
+      configuredDelay,
+      Math.max(0, intro.speechDuration - 1 / fps),
+    );
+    titleVisibleUntilFrame = Math.round(
+      (intro.start + actualDelay) * fps,
+    );
+  }
+
+  const titleVisible = frame < titleVisibleUntilFrame;
   return (
     <div style={{ width: "100%", height: "100%", background: "transparent" }}>
       {audioFile ? (

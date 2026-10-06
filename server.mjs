@@ -179,6 +179,11 @@ const probeDuration = async (file) => {
 const concatPath = (file) =>
   `file '${file.replace(/\\/g, "/").replace(/'/g, "'\\''")}'`;
 
+// 开场白开始后多久开始向第一根柱子运镜
+const INTRO_CAMERA_DELAY_SECONDS = 1;
+// 开场白结束/镜头到位后，等待多久开始解说第一根柱子
+const INTRO_TO_FIRST_GAP_SECONDS = 1;
+
 const startRankingGeneration = async (jobId, payload) => {
   const jobDir = resolve("jobs", jobId);
   const segmentDir = join(jobDir, "audio", "segments");
@@ -199,6 +204,7 @@ const startRankingGeneration = async (jobId, payload) => {
     const localPython = resolve(".venv", "Scripts", "python.exe");
     const python = existsSync(localPython) ? localPython : "python";
     const silenceFile = join(jobDir, "audio", "silence.wav");
+    const introSilenceFile = join(jobDir, "audio", "intro-silence.wav");
     rankingJobs.set(jobId, {
       status: "generating-audio",
       message: `正在生成 1/${segments.length} 段语音`,
@@ -215,6 +221,8 @@ const startRankingGeneration = async (jobId, payload) => {
       "pcm_s16le",
       silenceFile,
     ]);
+    // 开场专用静音
+    await runProcess("ffmpeg", ["-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", String(INTRO_TO_FIRST_GAP_SECONDS), "-c:a", "pcm_s16le", introSilenceFile]);
     const timelineSegments = [];
     const concatEntries = [];
     let cursor = 0;
@@ -252,20 +260,24 @@ const startRankingGeneration = async (jobId, payload) => {
       });
       const speechFile = speechJobs[index].output;
       const speechDuration = await probeDuration(speechFile);
-      const duration = speechDuration + payload.interval;
+      const isIntro = segment.id === "intro";
+      // 开场白使用自己的间隔，柱子之间继续使用页面参数
+      const intervalDuration = isIntro ? INTRO_TO_FIRST_GAP_SECONDS : payload.interval;
+      const duration = speechDuration + intervalDuration;
       timelineSegments.push({
         ...segment,
         index,
         start: cursor,
         speechDuration,
-        intervalDuration: payload.interval,
+        intervalDuration,
+        cameraMoveDelay: isIntro ? INTRO_CAMERA_DELAY_SECONDS : undefined,
         duration,
         end: cursor + duration,
         startFrame: Math.round(cursor * 30),
         durationInFrames: Math.round(duration * 30),
       });
       cursor += duration;
-      concatEntries.push(concatPath(speechFile), concatPath(silenceFile));
+      concatEntries.push(concatPath(speechFile), concatPath(isIntro ? introSilenceFile : silenceFile));
     }
     const concatFile = join(jobDir, "audio", "concat.txt");
     const audioFile = join(jobDir, "audio", "ranking.wav");

@@ -28,10 +28,11 @@ export type TimelineSegment = {
   speechDuration: number;
   intervalDuration: number;
   duration: number;
+  cameraMoveDelay?: number;
 };
 
 export const data: RankingItem[] = [
-  { rank: 10, name: "利比亚", value: 480, unit: "亿桶" },
+  { rank: 10, name: "利比亚", value: 480, unit: "" },
   { rank: 9, name: "俄罗斯", value: 740, unit: "亿桶" },
   { rank: 8, name: "美国", value: "约800", unit: "亿桶" },
   { rank: 7, name: "科威特", value: 1015, unit: "亿桶" },

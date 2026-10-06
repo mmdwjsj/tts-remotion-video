@@ -73,17 +73,31 @@ export function Camera({items, timeline, startOffsetFrames = 0, contentDurationF
     const intro = timeline.find((segment) => segment.id === "intro");
     if (!rankingSegments.length) return null;
     const first = ordered.find((item) => item.rank === rankingSegments[0].rank) ?? ordered[0];
-    if (intro && seconds < intro.start + intro.speechDuration) {
-      const p = Easing.inOut(Easing.cubic)(Math.min(1, Math.max(0, (seconds - intro.start) / Math.max(intro.speechDuration, 1 / fps))));
+    // 开场白
+    if (intro) {
+      const speechEnd = intro.start + intro.speechDuration;
+      const configuredDelay = intro.cameraMoveDelay ?? 0.5;
+      // 开场白短于 0.5 秒时立即开始运镜。
+      const cameraMoveDelay = Math.min(configuredDelay, Math.max(0, intro.speechDuration - 1 / fps));
+      const moveStart = intro.start + cameraMoveDelay;
+      const p = Easing.inOut(Easing.cubic)(Math.min(1, Math.max(0, (seconds - moveStart) / Math.max(speechEnd - moveStart, 1 / fps))));
       const firstY = heightFor(first) + cameraConfig.lookAtHeightOffset;
       const brandPosition = new THREE.Vector3(cameraConfig.overviewX, cameraConfig.overviewY, cameraConfig.overviewZ);
       const brandTarget = new THREE.Vector3(0, cameraConfig.overviewLookAtY, 0);
       const columnPosition = new THREE.Vector3(xFor(first) + cameraConfig.cameraSideOffsetX, firstY + cameraConfig.cameraHeightOffset, cameraConfig.cameraDistanceZ);
       const columnTarget = new THREE.Vector3(xFor(first), firstY + cameraConfig.lookAtPitch, 0);
-      camera.position.copy(brandPosition.lerp(columnPosition, p));
-      camera.lookAt(brandTarget.lerp(columnTarget, p));
-      return null;
+      if (seconds < moveStart) {
+        camera.position.copy(brandPosition);
+        camera.lookAt(brandTarget);
+        return null;
+      }
+      if (seconds < speechEnd) {
+        camera.position.copy(brandPosition.clone().lerp(columnPosition, p));
+        camera.lookAt(brandTarget.clone().lerp(columnTarget, p));
+        return null;
+      }
     }
+    // 到达第一根柱子之后，在剩余的开场区间保持聚焦
     if (intro && seconds < intro.start + intro.duration) {
       focus(first);
       return null;

@@ -1,4 +1,5 @@
 export const cameraConfig = {
+  // 没有timeline则使用这个固定帧数 150/3=5秒
   introDuration: 150,
   introApproachDuration: 75,
   // 镜头与柱子的距离  镜头前后距离
