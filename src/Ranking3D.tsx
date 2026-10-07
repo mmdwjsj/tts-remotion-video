@@ -56,9 +56,7 @@ export const Ranking3D: React.FC<RankingVideoProps> = ({
       configuredDelay,
       Math.max(0, intro.speechDuration - 1 / fps),
     );
-    titleVisibleUntilFrame = Math.round(
-      (intro.start + actualDelay) * fps,
-    );
+    titleVisibleUntilFrame = BRAND_INTRO_FRAMES + Math.round((intro.start + actualDelay) * fps);
   }
 
   const titleVisible = frame < titleVisibleUntilFrame;
