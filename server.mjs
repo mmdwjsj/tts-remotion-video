@@ -320,6 +320,18 @@ const startRankingGeneration = async (jobId, payload) => {
     );
     await copyFile(audioFile, join(publicJobDir, "ranking.wav"));
     await copyFile(timelineFile, join(publicJobDir, "timeline.json"));
+    if (payload.mode === "audio") {
+      rankingJobs.set(jobId, {
+        status: "done",
+        message: "音频生成完成",
+        audioFilename: "ranking.wav",
+        timelineFilename: "timeline.json",
+        audioUrl: `/ranking-download/${jobId}/audio`,
+        timelineUrl: `/ranking-download/${jobId}/timeline`,
+        files: { audio: audioFile, timeline: timelineFile },
+      });
+      return;
+    }
     rankingJobs.set(jobId, {
       status: "rendering",
       message: "正在按 Timeline 总时长渲染视频",
@@ -437,6 +449,7 @@ createServer(async (req, res) => {
       const payload = await readBody(req);
       const interval = Number(payload.interval);
       const speed = Number(payload.speed ?? 0.8);
+      const mode = payload.mode === "audio" ? "audio" : "video";
       if (!String(payload.intro || "").trim())
         return sendJson(res, 400, { error: "请输入泰文开场白" });
       if (!Array.isArray(payload.items) || payload.items.length < 1)
@@ -465,6 +478,7 @@ createServer(async (req, res) => {
         intro: String(payload.intro).trim(),
         interval,
         speed,
+        mode,
       });
       return sendJson(res, 202, { jobId });
     } catch (error) {

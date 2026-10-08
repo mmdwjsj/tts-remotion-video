@@ -1,22 +1,439 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3D 排名视频生成器</title>
-<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,"Microsoft YaHei",sans-serif;background:#07152c;color:#f8edd0}main{max-width:1120px;margin:38px auto;padding:0 24px}h1{margin:0 0 8px}.lead,.hint{color:#91a6c4}.card{padding:24px;border:1px solid #25446b;border-radius:18px;background:#0d203e;box-shadow:0 18px 60px #0005}.grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:20px}label{display:grid;gap:7px;font-weight:650}input,textarea{width:100%;padding:11px;border:1px solid #36567e;border-radius:9px;background:#07172d;color:#fff;font:inherit}textarea{min-height:105px;resize:vertical;line-height:1.6}table{width:100%;border-collapse:collapse}th{color:#d8b36a;text-align:left}th,td{padding:7px}td:first-child{width:90px}td:nth-child(4){width:150px}td:nth-child(5){width:110px}td:last-child{width:70px}.section{margin:24px 0 10px;color:#d8b36a;font-weight:700}.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px}button,.download{padding:12px 17px;border:0;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer}.primary{background:#d8b36a;color:#14233b}.secondary{background:#38577e;color:#fff}.danger{background:transparent;color:#ff9a9a;padding:8px}.download{display:none;background:#2eaa72;color:#fff}.status{margin-left:auto;color:#b9c8dc}.progress{display:none;height:8px;margin-top:18px;border-radius:99px;overflow:hidden;background:#1c3557}.progress i{display:block;width:8%;height:100%;background:#d8b36a;animation:load 1.2s infinite alternate}@keyframes load{to{width:88%}}pre{white-space:pre-wrap;line-height:1.75;margin:0;padding:18px;border-radius:10px;background:#07172d;border:1px solid #29496f;color:#e8eef7}audio{display:none;width:100%;margin-top:18px}@media(max-width:750px){.grid{grid-template-columns:1fr}.card{padding:14px}.status{width:100%;margin:0}}</style></head>
-<body><main><h1>3D 排名视频生成器</h1><p class="lead">输入泰文开场白和排名数据，自动生成分段语音、合并音频、Timeline 和同长度视频。</p><section class="card">
-<div class="grid"><label>视频标题<input id="title" value="อันดับปริมาณสำรองน้ำมันของโลก"></label><label>柱子移动间隔（秒）<input id="interval" type="number" min="0.1" max="20" step="0.1" value="2"></label><label>语速（越小越慢）<input id="speed" type="number" min="0.5" max="2" step="0.1" value="0.8"></label><label>输出文件名<input id="filename" value="ranking-video.mp4"></label></div>
-<label>开场白（泰文）<textarea id="intro" placeholder="กรอกคำเกริ่นนำภาษาไทยที่นี่"></textarea></label>
-<div class="section">排名数据</div><p class="hint">系统按照排名数字从大到小生成：อันดับที่ 3、อันดับที่ 2、อันดับที่ 1。</p>
-<table><thead><tr><th>排名</th><th>名称（泰文）</th><th>显示名称</th><th>数值</th><th>单位</th><th></th></tr></thead><tbody id="rows"></tbody></table>
-<div class="actions"><button class="secondary" id="add">＋ 添加一行</button><button class="primary" id="generate">生成音频和视频</button><a class="download" id="audioDownload">下载 WAV</a><a class="download" id="timelineDownload">下载 Timeline</a><a class="download" id="videoDownload">下载 MP4</a><span class="status" id="status"></span></div><div class="progress" id="progress"><i></i></div><audio id="player" controls></audio>
-<div class="section">将要生成的完整音频文案</div><pre id="preview"></pre>
-</section></main><script>
-const rows=document.querySelector('#rows'),preview=document.querySelector('#preview'),button=document.querySelector('#generate'),statusEl=document.querySelector('#status'),progress=document.querySelector('#progress'),player=document.querySelector('#player');
-const esc=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
-function addRow(v={}){const tr=document.createElement('tr');tr.innerHTML=`<td><input type="number" min="1" data-k="rank" value="${esc(v.rank??rows.children.length+1)}"></td><td><input data-k="name" value="${esc(v.name)}" placeholder="ชื่อภาษาไทย"></td><td><input data-k="displayName" value="${esc(v.displayName??v.name)}" placeholder="柱子上显示的名称"></td><td><input data-k="value" value="${esc(v.value)}" placeholder="800"></td><td><input data-k="unit" value="${esc(v.unit)}" placeholder="หน่วย"></td><td><button class="danger" type="button">删除</button></td>`;const nameInput=tr.querySelector('[data-k="name"]'),displayNameInput=tr.querySelector('[data-k="displayName"]');let displayNameEdited=v.displayName!=null&&v.displayName!==v.name;nameInput.oninput=()=>{if(!displayNameEdited)displayNameInput.value=nameInput.value;updatePreview()};displayNameInput.oninput=()=>{displayNameEdited=true;updatePreview()};tr.querySelectorAll('input').forEach(i=>{if(i!==nameInput&&i!==displayNameInput)i.oninput=updatePreview});tr.querySelector('button').onclick=()=>{tr.remove();updatePreview()};rows.append(tr);updatePreview()}
-function items(){return [...rows.children].map(tr=>Object.fromEntries([...tr.querySelectorAll('input')].map(i=>[i.dataset.k,i.type==='number'?Number(i.value):i.value.trim()]))) }
-function scriptSegments(){const gap=Number(document.querySelector('#interval').value)||0;const result=[];const intro=document.querySelector('#intro').value.trim();if(intro)result.push({label:'开场白',text:intro});items().sort((a,b)=>b.rank-a.rank).forEach(x=>result.push({label:`排名 ${x.rank}`,text:`อันดับที่ ${x.rank} ${x.name}`}));return {gap,result}}
-function updatePreview(){const {gap,result}=scriptSegments();preview.textContent=result.length?result.map((x,i)=>`${i+1}. [${x.label}]\n${x.text}\n[静音/柱子移动 ${gap} 秒]`).join('\n\n'):'请填写开场白和排名数据';}
-[{rank:3,name:'อิรัก',displayName:'伊拉克',value:1450,unit:'km'},{rank:2,name:'ซาอุดีอาระเบีย',displayName:'沙特阿拉伯',value:2670,unit:'亿桶'},{rank:1,name:'เวเนซุเอลา',displayName:'委内瑞拉',value:3030,unit:'亿桶'}].forEach(addRow);document.querySelector('#add').onclick=()=>addRow();document.querySelector('#intro').oninput=updatePreview;document.querySelector('#interval').oninput=updatePreview;
-function link(id,url,name){const a=document.querySelector(id);a.href=url;a.download=name;a.style.display='inline-block'}
-function failed(msg){button.disabled=false;progress.style.display='none';statusEl.textContent='生成失败：'+msg}
-button.onclick=async()=>{button.disabled=true;progress.style.display='block';statusEl.textContent='正在分段生成语音…';document.querySelectorAll('.download').forEach(a=>a.style.display='none');player.style.display='none';try{const r=await fetch('/api/ranking-generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.querySelector('#title').value.trim(),filename:document.querySelector('#filename').value.trim(),intro:document.querySelector('#intro').value.trim(),interval:Number(document.querySelector('#interval').value),speed:Number(document.querySelector('#speed').value),items:items()})});const data=await r.json();if(!r.ok)throw new Error(data.error);poll(data.jobId)}catch(e){failed(e.message)}};
-async function poll(id){try{const r=await fetch('/api/ranking-jobs/'+id),job=await r.json();if(!r.ok||job.status==='error')return failed(job.error||'任务不存在');statusEl.textContent=job.message||'正在生成…';if(job.status==='done'){button.disabled=false;progress.style.display='none';statusEl.textContent='音频、Timeline 和视频生成完成';link('#audioDownload',job.audioUrl,job.audioFilename);link('#timelineDownload',job.timelineUrl,job.timelineFilename);link('#videoDownload',job.videoUrl,job.videoFilename);player.src=job.audioUrl;player.style.display='block';player.load();return}setTimeout(()=>poll(id),1000)}catch(e){failed(e.message)}}
-</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>3D 排名视频生成器</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, "Microsoft YaHei", sans-serif;
+        background: #07152c;
+        color: #f8edd0;
+      }
+      main {
+        max-width: 1120px;
+        margin: 38px auto;
+        padding: 0 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+      }
+      .lead,
+      .hint {
+        color: #91a6c4;
+      }
+      .card {
+        padding: 24px;
+        border: 1px solid #25446b;
+        border-radius: 18px;
+        background: #0d203e;
+        box-shadow: 0 18px 60px #0005;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 14px;
+        margin-bottom: 20px;
+      }
+      label {
+        display: grid;
+        gap: 7px;
+        font-weight: 650;
+      }
+      input,
+      textarea {
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #36567e;
+        border-radius: 9px;
+        background: #07172d;
+        color: #fff;
+        font: inherit;
+      }
+      textarea {
+        min-height: 105px;
+        resize: vertical;
+        line-height: 1.6;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        color: #d8b36a;
+        text-align: left;
+      }
+      th,
+      td {
+        padding: 7px;
+      }
+      td:first-child {
+        width: 90px;
+      }
+      td:nth-child(4) {
+        width: 150px;
+      }
+      td:nth-child(5) {
+        width: 110px;
+      }
+      td:last-child {
+        width: 70px;
+      }
+      .section {
+        margin: 24px 0 10px;
+        color: #d8b36a;
+        font-weight: 700;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+      }
+      button,
+      .download {
+        padding: 12px 17px;
+        border: 0;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 15px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .primary {
+        background: #d8b36a;
+        color: #14233b;
+      }
+      .secondary {
+        background: #38577e;
+        color: #fff;
+      }
+      .danger {
+        background: transparent;
+        color: #ff9a9a;
+        padding: 8px;
+      }
+      .download {
+        display: none;
+        background: #2eaa72;
+        color: #fff;
+      }
+      .status {
+        margin-left: auto;
+        color: #b9c8dc;
+      }
+      .progress {
+        display: none;
+        height: 8px;
+        margin-top: 18px;
+        border-radius: 99px;
+        overflow: hidden;
+        background: #1c3557;
+      }
+      .progress i {
+        display: block;
+        width: 8%;
+        height: 100%;
+        background: #d8b36a;
+        animation: load 1.2s infinite alternate;
+      }
+      @keyframes load {
+        to {
+          width: 88%;
+        }
+      }
+      pre {
+        white-space: pre-wrap;
+        line-height: 1.75;
+        margin: 0;
+        padding: 18px;
+        border-radius: 10px;
+        background: #07172d;
+        border: 1px solid #29496f;
+        color: #e8eef7;
+      }
+      audio {
+        display: none;
+        width: 100%;
+        margin-top: 18px;
+      }
+      @media (max-width: 750px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .card {
+          padding: 14px;
+        }
+        .status {
+          width: 100%;
+          margin: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>3D 排名视频生成器</h1>
+      <p class="lead">
+        输入泰文开场白和排名数据，自动生成分段语音、合并音频、Timeline
+        和同长度视频。
+      </p>
+      <section class="card">
+        <div class="grid">
+          <label
+            >视频标题<input
+              id="title"
+              value="" /></label
+          ><label
+            >柱子移动间隔（秒）<input
+              id="interval"
+              type="number"
+              min="0.1"
+              max="20"
+              step="0.1"
+              value="2" /></label
+          ><label
+            >语速（越小越慢）<input
+              id="speed"
+              type="number"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value="0.8" /></label
+          ><label
+            >输出文件名<input id="filename" value="ranking-video.mp4"
+          /></label>
+        </div>
+        <label
+          >开场白（泰文）<textarea
+            id="intro"
+            placeholder="ต่อไป มาดูกันว่า"
+          ></textarea>
+        </label>
+        <div class="section">排名数据</div>
+        <p class="hint">
+          系统按照排名数字从大到小生成：อันดับที่ 3、อันดับที่ 2、อันดับที่ 1。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>名称（泰文）</th>
+              <th>显示名称</th>
+              <th>数值</th>
+              <th>单位</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="actions">
+          <button class="secondary" id="add">＋ 添加一行</button
+          ><button class="primary" id="clear" type="button">清空表格</button
+          ><button class="primary" id="generateBoth">生成音频和视频</button
+          ><button class="primary" id="generateAudio">生成音频</button
+          ><button class="primary" id="generateVideo">生成视频</button
+          ><a class="download" id="audioDownload">下载 WAV</a
+          ><a class="download" id="timelineDownload">下载 Timeline</a
+          ><a class="download" id="videoDownload">下载 MP4</a
+          ><span class="status" id="status"></span>
+        </div>
+        <div class="progress" id="progress"><i></i></div>
+        <audio id="player" controls></audio>
+        <div class="section">将要生成的完整音频文案</div>
+        <pre id="preview"></pre>
+      </section>
+    </main>
+    <script>
+      const rows = document.querySelector("#rows"),
+        preview = document.querySelector("#preview"),
+        bothButton = document.querySelector("#generateBoth"),
+        audioButton = document.querySelector("#generateAudio"),
+        videoButton = document.querySelector("#generateVideo"),
+        statusEl = document.querySelector("#status"),
+        progress = document.querySelector("#progress"),
+        player = document.querySelector("#player");
+      const esc = (v) =>
+        String(v ?? "").replace(
+          /[&<>\"]/g,
+          (c) =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;" })[c],
+        );
+      function addRow(v = {}) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td><input type="number" min="1" data-k="rank" value="${esc(v.rank ?? rows.children.length + 1)}"></td><td><input data-k="name" value="${esc(v.name)}" placeholder="ชื่อภาษาไทย"></td><td><input data-k="displayName" value="${esc(v.displayName ?? v.name)}" placeholder="柱子上显示的名称"></td><td><input data-k="value" value="${esc(v.value)}" placeholder=""></td><td><input data-k="unit" value="${esc(v.unit)}" placeholder="หน่วย"></td><td><button class="danger" type="button">删除</button></td>`;
+        const nameInput = tr.querySelector('[data-k="name"]'),
+          displayNameInput = tr.querySelector('[data-k="displayName"]');
+        let displayNameEdited =
+          v.displayName != null && v.displayName !== v.name;
+        nameInput.oninput = () => {
+          if (!displayNameEdited) displayNameInput.value = nameInput.value;
+          updatePreview();
+        };
+        displayNameInput.oninput = () => {
+          displayNameEdited = true;
+          updatePreview();
+        };
+        tr.querySelectorAll("input").forEach((i) => {
+          if (i !== nameInput && i !== displayNameInput)
+            i.oninput = updatePreview;
+        });
+        tr.querySelector("button").onclick = () => {
+          tr.remove();
+          updatePreview();
+        };
+        rows.append(tr);
+        updatePreview();
+      }
+      function items() {
+        return [...rows.children].map((tr) =>
+          Object.fromEntries(
+            [...tr.querySelectorAll("input")].map((i) => [
+              i.dataset.k,
+              i.type === "number" ? Number(i.value) : i.value.trim(),
+            ]),
+          ),
+        );
+      }
+      function scriptSegments() {
+        const gap = Number(document.querySelector("#interval").value) || 0;
+        const result = [];
+        const intro = document.querySelector("#intro").value.trim();
+        if (intro) result.push({ label: "开场白", text: intro });
+        items()
+          .sort((a, b) => b.rank - a.rank)
+          .forEach((x) =>
+            result.push({
+              label: `排名 ${x.rank}`,
+              text: `อันดับที่ ${x.rank} ${x.name}`,
+            }),
+          );
+        return { gap, result };
+      }
+      function updatePreview() {
+        const { gap, result } = scriptSegments();
+        preview.textContent = result.length
+          ? result
+              .map(
+                (x, i) =>
+                  `${i + 1}. [${x.label}]\n${x.text}\n[静音/柱子移动 ${gap} 秒]`,
+              )
+              .join("\n\n")
+          : "请填写开场白和排名数据";
+      }
+      [
+        { rank: 3, name: "", displayName: "", value: "", unit: "" },
+        {
+          rank: 2,
+          name: "",
+          displayName: "",
+          value: "",
+          unit: "",
+        },
+        { rank: 1, name: "", displayName: "", value: "", unit: "" },
+      ].forEach(addRow);
+      document.querySelector("#add").onclick = () => addRow();
+      document.querySelector("#clear").onclick = () => {
+        rows.querySelectorAll('input:not([data-k="rank"])').forEach((input) => {
+          input.value = "";
+          input.dispatchEvent(new Event("input"));
+        });
+        updatePreview();
+      };
+      document.querySelector("#intro").oninput = updatePreview;
+      document.querySelector("#interval").oninput = updatePreview;
+      function link(id, url, name) {
+        const a = document.querySelector(id);
+        a.href = url;
+        a.download = name;
+        a.style.display = "inline-block";
+      }
+      function failed(msg) {
+        bothButton.disabled = false;
+        audioButton.disabled = false;
+        videoButton.disabled = false;
+        progress.style.display = "none";
+        statusEl.textContent = "生成失败：" + msg;
+      }
+      async function generate(mode) {
+        bothButton.disabled = true;
+        audioButton.disabled = true;
+        videoButton.disabled = true;
+        progress.style.display = "block";
+        statusEl.textContent =
+          mode === "audio"
+            ? "正在生成音频…"
+            : mode === "both"
+              ? "正在生成音频和视频…"
+              : "正在生成视频所需的音频…";
+        document
+          .querySelectorAll(".download")
+          .forEach((a) => (a.style.display = "none"));
+        player.style.display = "none";
+        try {
+          const r = await fetch("/api/ranking-generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: document.querySelector("#title").value.trim(),
+              filename: document.querySelector("#filename").value.trim(),
+              intro: document.querySelector("#intro").value.trim(),
+              interval: Number(document.querySelector("#interval").value),
+              speed: Number(document.querySelector("#speed").value),
+              items: items(),
+              mode,
+            }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error);
+          poll(data.jobId, mode);
+        } catch (e) {
+          failed(e.message);
+        }
+      }
+      bothButton.onclick = () => generate("both");
+      audioButton.onclick = () => generate("audio");
+      videoButton.onclick = () => generate("video");
+      async function poll(id, mode) {
+        try {
+          const r = await fetch("/api/ranking-jobs/" + id),
+            job = await r.json();
+          if (!r.ok || job.status === "error")
+            return failed(job.error || "任务不存在");
+          statusEl.textContent = job.message || "正在生成…";
+          if (job.status === "done") {
+            bothButton.disabled = false;
+            audioButton.disabled = false;
+            videoButton.disabled = false;
+            progress.style.display = "none";
+            statusEl.textContent =
+              mode === "audio"
+                ? "音频和 Timeline 生成完成"
+                : mode === "both"
+                  ? "音频、Timeline 和视频生成完成"
+                  : "视频生成完成";
+            if (job.audioUrl) {
+              link("#audioDownload", job.audioUrl, job.audioFilename);
+              player.src = job.audioUrl;
+              player.style.display = "block";
+              player.load();
+            }
+            if (job.timelineUrl)
+              link("#timelineDownload", job.timelineUrl, job.timelineFilename);
+            if (job.videoUrl)
+              link("#videoDownload", job.videoUrl, job.videoFilename);
+            return;
+          }
+          setTimeout(() => poll(id, mode), 1000);
+        } catch (e) {
+          failed(e.message);
+        }
+      }
+    </script>
+  </body>
+</html>
