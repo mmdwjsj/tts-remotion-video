@@ -6,8 +6,19 @@ export const numericValue = (value: number | string): number => {
 };
 
 export const displayValue = (value: number | string): string => {
-  const numeric = numericValue(value);
-  return Number.isFinite(numeric) ? numeric.toLocaleString("en-US") : String(value).trim();
+  if (typeof value === "string") {
+    const text = value.trim();
+    // Preserve presentation-only prefixes/suffixes (such as $, %, or words),
+    // while adding thousands separators only to the numeric integer part.
+    return text.replace(/[-+]?\d[\d,]*(?:\.\d+)?/, (numberText) => {
+      const normalized = numberText.replace(/,/g, "");
+      const match = normalized.match(/^([-+]?)(\d+)(\.\d+)?$/);
+      if (!match) return numberText;
+      const [, sign, integer, fraction = ""] = match;
+      return `${sign}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction}`;
+    });
+  }
+  return value.toLocaleString("en-US");
 };
 
 import * as THREE from "three";

@@ -1,6 +1,7 @@
 export type RankingItem = {
   rank: number;
   name: string;
+  displayName?: string;
   value: number | string;
   unit?: string;
   color?: string;

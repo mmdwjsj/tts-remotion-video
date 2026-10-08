@@ -3,4 +3,4 @@ export const BRAND_INTRO_FRAMES = 30;
 // INTRO_CAMERA_DELAY_SECONDS + BRAND_INTRO_FRAMES = TITLE_VISIBLE_FRAMES
 // 开场白开始后多久开始向第一根柱子运镜
 export const TITLE_VISIBLE_FRAMES = 150;
-export const BRAND_OUTRO_FRAMES = 90;
+export const BRAND_OUTRO_FRAMES = 60;

@@ -37,7 +37,7 @@ export function Column({item, index, total, maxValue}: {item: RankingItem; index
     <RoundedBox position={[0, (textY[1] + textY[2]) / 2, labelDepth + 0.035]} args={[labelWidth, rowHeight * 2, 0.028]} radius={0.018} smoothness={4}>
       <meshBasicMaterial color="#7c8585" />
     </RoundedBox>
-    <Text position={[0, textY[0], labelDepth + 0.085]} fontSize={0.22} fontWeight={700} color="#fff7df" anchorX="center" anchorY="middle">{item.name}</Text>
+    <Text position={[0, textY[0], labelDepth + 0.085]} fontSize={0.22} fontWeight={700} color="#fff7df" anchorX="center" anchorY="middle">{item.displayName?.trim() || item.name}</Text>
     <Text position={[0, textY[1], labelDepth + 0.085]} fontSize={0.19} fontWeight={700} color="#ffe9a6" anchorX="center" anchorY="middle">{[displayValue(item.value), item.unit?.trim()].filter(Boolean).join(" ")}</Text>
     <Text position={[0, textY[2], labelDepth + 0.085]} fontSize={0.18} fontWeight={700} color="#fff7df" anchorX="center" anchorY="middle">{`NO.${item.rank}`}</Text>
   </group>;
